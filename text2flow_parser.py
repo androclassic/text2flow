@@ -39,7 +39,6 @@ def text2graph(flowchart_text):
         
         if node_id in nodes:
             return node_id
-        
         nodes[node_id] = {
             'label': label,
             'attributes': attributes,
@@ -49,24 +48,26 @@ def text2graph(flowchart_text):
 
     def add_edge(from_node, to_node, label=None, metadata=dict()):
         metadata = metadata.copy() 
-        if len(metadata):
-            print(metadata)
         metadata['from'] = from_node
         metadata['to'] = to_node
         metadata['label'] = label
         edges.append(metadata)
         
     def parse_attributes(content):
-        attr_match = re.search(r'\[(.*?)\]', content)
-        attributes = {}
+        # Define the regex pattern to match the key-value pairs within the brackets
+        pattern = r'\[(.*?)\]'
+        key_value_pattern = r'(\w+)="([^"]*?)"'
 
-        if attr_match:
-            attr_str = attr_match.group(1)
-            for attr in attr_str.split():
-                key, value = attr.split('=')
-                attributes[key] = value.strip('"')
-
-            content = content[:attr_match.start()].strip()
+        # Extract the part of the string within the brackets
+        match = re.search(pattern, content, re.DOTALL)
+        attributes=dict()
+        if match:
+            bracket_content = match.group(1)
+            # Find all key-value pairs within the extracted content
+            matches = re.findall(key_value_pattern, bracket_content)
+            # Convert matches to a dictionary
+            attributes = dict(matches)
+            content = content[:match.start()].strip()
         return content, attributes
 
     def parse_id_and_tags(content):
@@ -109,7 +110,6 @@ def text2graph(flowchart_text):
     for line in lines:
         indent = len(line) - len(line.lstrip())
         line = line.strip()
-        attributes = {}
 
         
         edge_delimiter = has_colon_outside_brackets(line)
@@ -121,7 +121,7 @@ def text2graph(flowchart_text):
             edge_content = line[:edge_delimiter-1].strip()
             node_content = line[edge_delimiter:]
 
-        label, node_id, tags, attr = parse_line(node_content)
+        label, node_id, tags, attributes = parse_line(node_content)
         
         
         label = translate_reference(label)
@@ -193,6 +193,8 @@ def create_graph(nodes, edges):
     for node_id, node_info in nodes.items():
         label = node_info['label']
         href = node_info['attributes'].get('href', '')
+        notes = node_info['attributes'].get('notes', label)
+        
         tags = node_info['tags']
         
         # Determine node style
@@ -201,7 +203,7 @@ def create_graph(nodes, edges):
             if tag in tag_styles:
                 style = tag_styles[tag]
                 break
-        dot.node(node_id, label=label, shape=style['shape'], style='filled', fillcolor=style['color'], href=href)
+        dot.node(node_id, label=label, shape=style['shape'], style='filled', fillcolor=style['color'], href=href, tooltip=notes)
 
     # Add edges with labels if specified
     for edge in edges:
